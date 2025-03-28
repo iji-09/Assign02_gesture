@@ -1,50 +1,51 @@
 let port;  // 시리얼 포트 객체
-let isConnected = false;
-let selectedPort = null;
-let portSelect;
+let isConnected = false; // 아두이노 연결 상태
+let selectedPort = null; // 선택된 포트 저장용
+let portSelect;          // 포트 선택 UI -> 이걸 쓰나?
 
-// 신호등 기본기능 시간 및 설정 변수
+// 신호등 기본 시간 설정값 (ms 단위)
 let redTime = 2000, yellowTime = 500, greenTime = 2000;
-let brightness = 255;
-let greenBlinkInterval = 166;
+let brightness = 255; // 초기 밝기
+let greenBlinkInterval = 166; // 초록불 깜빡임 간격
 
 let currentLight = "red"; // 현재 신호등 상태
-let mode = "normal"; // 기본 모드
+let mode = "normal"; // 현재 모드 (기본값 normal)
 
-let isBlinking = false; // 모든 LED가 깜빡이는 상태
-let isRedOnly = false; // 빨간불 전용 모드
-let isTraffic = true; // 신호등 작동 여부
+let isBlinking = false;   // 모든 LED 깜빡이는 상태 여부
+let isRedOnly = false;    // 빨간불 전용 모드 여부
+let isTraffic = true;     // 신호등 작동 중인지 여부
+let isGreenBlink = false; // 초록불 깜빡이기 진행 중 여부
 
-let isGreenBlink = false; // 초록불 깜빡이기
-
-let blinkCount = 0;
-let lastChange = 0;
-let ledOn = false; // LED 켜진 상태
+let blinkCount = 0; // 깜빡임 횟수
+let lastChange = 0; // 마지막 상태 변경 시간
+let ledOn = false;  // LED 켜진 상태
 
 //ㅡㅡㅡㅡhandpose 관련 변수 선언ㅡㅡㅡㅡ
-let handpose;
-let video;
-let hands = [];
+let handpose;   // handpose 모델
+let video;      // 비디오 입력
+let hands = []; // 검출된 손 정보
 
-let activeSlider = null; // 빨간 LED
-let prevX = null; // 빨간 LED
+let activeSlider = null;  // 현재 제어 중인 슬라이더
+let prevX = null;  // 이전 손의 X 위치
 let isMiddleRing = false;
 let isShaka = false;
 let isPalmBack = false;
-let gestureCooldown = 2000;
-let lastGestureTime = 0;
+let gestureCooldown = 2000;  // 제스처 쿨타임 (ms)
+let lastGestureTime = 0;    // 마지막 제스처 실행 시간
 
 
-
+// setup: 처음 한 번 실행되는 함수
 async function setup() {
-    createCanvas(640, 1020);
-    background(240);
+    createCanvas(640, 1020);  // 캔버스 생성
+    background(240);          // 배경 색상
 
     // --------- handpose + 웹캠 설정 ----------
+    // 비디오 캡처 및 handpose 모델 로딩
     video = createCapture(VIDEO);
     video.size(640, 400);
     video.hide(); // 비디오를 캔버스에만 그리기 위해 숨김
     
+    // handpose 모델 로딩 및 예측 결과 저장
     handpose = ml5.handpose(video, () => {
         console.log("Handpose model loaded");
     });
@@ -116,50 +117,49 @@ async function connectBtnClick(portSelect) {
     if (!isConnected) {
         try {
             selectedPort = await navigator.serial.requestPort(); // 포트 선택 창 표시
-            await selectedPort.open({ baudRate: 9600 });
-            port = selectedPort;
-            isConnected = true;
-            console.log("Connect Arduino");
+            await selectedPort.open({ baudRate: 9600 }); // 선택한 포트를 9600 보레이트로 열기 (아두이노 기본 통신속도)
+            port = selectedPort; // 전역 변수 port에 연결된 포트 정보 저장
+            isConnected = true; // 연결 상태를 true로 설정
+            console.log("Connect Arduino"); // 연결 완료 로그 출력
             readSerialData(); // 데이터 수신 시작
-
         } 
         catch (error) {
-            console.error("serial error:", error);
+            console.error("serial error:", error); // 연결 실패 시 콘솔에 에러 메시지 출력
         }
     } 
     else {
-        await port.close();
-        isConnected = false;
-        console.log("Arduino connecting canceled");
+        await port.close();  // 연결된 포트를 닫음
+        isConnected = false; // 연결 상태 false로 변경
+        console.log("Arduino connecting canceled"); // 연결 해제 로그 출력
     }
 }
 
 // 시리얼 데이터 수신
 let serialBuffer = "";
-async function readSerialData() {
-    while (port.readable && isConnected) {
-        const reader = port.readable.getReader();
+async function readSerialData() { // 시리얼 데이터를 비동기적으로 계속 읽기 위한 함수
+    while (port.readable && isConnected) { // 포트를 읽을 수 있고 연결 되어있을 때만 작동
+        const reader = port.readable.getReader(); // 포트로부터 데이터를 읽기 위해 reader 객체 생성
         try {
-            while (true) {
+            while (true) { // 연결이 끊기기 전까지는 계속 실행 됨(무한루프)
                 const { value, done } = await reader.read();
                 if (done) break;
-
+                // 데이터를 읽고 done이 true이면 종료(더이상 읽을 데이터가 X)
                 let decoder = new TextDecoder("utf-8");
                 let chunk = decoder.decode(value, { stream: true });
                 serialBuffer += chunk;
+                // 문자열을 읽어와서 기존 버퍼에 덧붙임
 
-                let lines = serialBuffer.split("\n");
-                for (let i = 0; i < lines.length - 1; i++) {
-                    //console.log("from Arduino:", lines[i].trim());
-                    updateTrafficState(lines[i].trim());
+                let lines = serialBuffer.split("\n"); // 문자열을 나누어 한줄씩 처리되도록 설정
+                for (let i = 0; i < lines.length - 1; i++) { // 마지막 줄은 아직 문자열을 덜 받았을 수도 있기 때문에 -1해서 처리
+                    updateTrafficState(lines[i].trim()); // trim으로 앞뒤 공백을 제거하고 함수에 전달
                 }
-                serialBuffer = lines[lines.length - 1];
+                serialBuffer = lines[lines.length - 1]; // 덜 받은 문자열은 다시 저장해서 다음 read 할 때 사용
             }
         } catch (error) {
             console.error("data error:", error);
         } finally {
             reader.releaseLock();
-        }
+        } // read가 끝나면 releaseLock을 이용해서 리더를 해제하고 다음 읽기를 동작해야함
     }
 }
 
@@ -176,7 +176,6 @@ function updateTrafficState(data) {
         let newBrightness = parseInt(data.split(":")[1].trim(), 10);
         brightnessSlider.value(newBrightness); // 슬라이더 값 업데이트
         brightness = newBrightness; // 내부 변수도 업데이트
-        //console.log("Arduino → p5: brightness:", newBrightness);
     }
     
     
@@ -254,7 +253,6 @@ function stopAll() {
     isTraffic = false;
     // 모드를 "stopped"로 바꿔서 어떤 기능도 없는 상태로 만듦
     mode = "stopped";
-    //console.log("All stop");
     
     // 화면 표시를 위해 lastChange를 초기화
     lastChange = millis();
@@ -523,13 +521,14 @@ function drawTrafficLights() {
 // ㅡㅡㅡㅡㅡㅡㅡ제스처 감지 함수ㅡㅡㅡㅡㅡㅡㅡ
 function detectGestureAndControlSlider() {
     if (hands.length === 0) return;
+    // 손이 화면에 안 보이면 함수 종료 (더 이상 아무것도 하지 않음)
 
     let hand = hands[0];
-    let landmarks = hand.landmarks;
-    let now = millis();
+    let landmarks = hand.landmarks; // 첫 번째 손을 가져와서 랜드마크 배열을 landmarks에 저장
+    let now = millis(); // 현재 시간을 now에 저장 (제스처 쿨타임 확인용)
 
 
-    // 제스처 판별
+    // ===== 제스처 상태 변수 초기화 =====
     let isFist = true; // 주먹(red slider)
     let isPeace = false; // 브이(yellow slider)
     let isHandOpen = false; // 보자기(green slider)
@@ -543,14 +542,14 @@ function detectGestureAndControlSlider() {
     for (let i = 8; i <= 20; i += 4) {
         if (landmarks[i][1] < landmarks[i - 2][1]) {
             isFist = false;
-        }
+        } // 손가락 5개가 모두 접혀 있어야 isFist = true
     }
 
     // ✌️ 브이: 2번(검지), 6번(중지) 펴짐 & 나머지 접힘
-    let indexUp = landmarks[8][1] < landmarks[6][1];
-    let middleUp = landmarks[12][1] < landmarks[10][1];
-    let ringDown = landmarks[16][1] > landmarks[14][1];
-    let pinkyDown = landmarks[20][1] > landmarks[18][1];
+    let indexUp = landmarks[8][1] < landmarks[6][1];     // 검지 펴짐
+    let middleUp = landmarks[12][1] < landmarks[10][1];  // 중지 펴짐
+    let ringDown = landmarks[16][1] > landmarks[14][1];  // 약지 접힘
+    let pinkyDown = landmarks[20][1] > landmarks[18][1]; // 새끼 접힘
     if (indexUp && middleUp && ringDown && pinkyDown) isPeace = true;
 
 
@@ -559,12 +558,12 @@ function detectGestureAndControlSlider() {
     for (let i = 8; i <= 20; i += 4) {
         if (landmarks[i][1] > landmarks[i - 2][1]) {
             allFingersUp = false;
-        }
+        } //손가락 끝이 중간마디보다 위에 있으면 손가락이 펴진 것으로 인식
     }
-    if (allFingersUp) isHandOpen = true;
+    if (allFingersUp) isHandOpen = true; // 모든 손가락이 펴졌을 경우 isHandOpen = true
 
     // 🤙 샤카: 엄지, 새끼손가락만 펼침
-    let thumbUp = landmarks[4][0] < landmarks[3][0];
+    let thumbUp = landmarks[4][0] < landmarks[3][0];  // 엄지 오른쪽으로 펼침
     let pinkyUp = landmarks[20][1] < landmarks[18][1];
     let indexDown = landmarks[8][1] > landmarks[6][1];
     let middleDown = landmarks[12][1] > landmarks[10][1];
@@ -577,7 +576,7 @@ function detectGestureAndControlSlider() {
                     landmarks[12][1] > landmarks[10][1] &&
                     landmarks[16][1] > landmarks[14][1] &&
                     landmarks[20][1] > landmarks[18][1];
-    if (indexOnly) isIndexOnly = true;
+    if (indexOnly) isIndexOnly = true; // 검지만 펴지고 나머지는 접혔다면 true
 
     // 👌 오케이 포즈
     let distThumbIndex = dist(landmarks[4][0], landmarks[4][1], landmarks[8][0], landmarks[8][1]);
@@ -585,6 +584,7 @@ function detectGestureAndControlSlider() {
     let ringUpOK   = landmarks[16][1] < landmarks[14][1];
     let pinkyUpOK  = landmarks[20][1] < landmarks[18][1];
     if (distThumbIndex < 40 && middleUpOK && ringUpOK && pinkyUpOK) isOKSign = true;
+    // 엄지와 검지 끝이 가까우면서 나머지 손가락이 펴져 있으면 OK 사인
 
 
     // 제스처에 따라 슬라이더 선택
@@ -598,21 +598,21 @@ function detectGestureAndControlSlider() {
         activeSlider = null;
     }
 
-    // 손 움직임에 따라 슬라이더 조절
+    // 손 움직임에 따라 슬라이더 조절(손 움직임으로 좌우 슬라이딩)
     let palmX = width - landmarks[0][0];  // 좌우 반전 적용
     if (prevX !== null && activeSlider) {
-        let dx = palmX - prevX;
-        if (abs(dx) > 5) {
+        let dx = palmX - prevX;             // 이전 X 위치와 비교
+        if (abs(dx) > 5) {                  // 너무 작으면 무시
             let val = activeSlider.value();
-            if (dx > 0) val += 100;
-            else val -= 100;
+            if (dx > 0) val += 100;         // 오른쪽 → 증가
+            else val -= 100;                // 왼쪽 → 감소
             val = constrain(val, activeSlider.elt.min, activeSlider.elt.max);
             activeSlider.value(val);
             sendTimingData(); // 값 변경 시 아두이노에 전송
         }
     }
 
-    prevX = palmX;
+    prevX = palmX; // 현재 위치 저장
 
 
     // 버튼 제어 (쿨타임 적용)
