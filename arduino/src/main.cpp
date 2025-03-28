@@ -83,8 +83,6 @@ bool B2_State = false;     // 버튼 2 상태
 bool B3_State = true;      // 버튼 3 상태
 // 여기서 각각의 상태를 false로 맞추고 시작함
 // 버튼을 누르면 true가 되고 true일 때 다시 누르면 false가 됨
-// 여기서 B3_State랑 Traffic_State가 달라도 괜찮은 건가?
-
 
 
 // -------------------------------
@@ -192,7 +190,8 @@ void Restart_Traffic() {
 // 시리얼 포트로 명령을 읽어와서 아두이노 동작을 수행하는 함수
 void processSerialInput() {
   if (Serial.available()) { // 시리얼 통신 버퍼에 읽을 데이터가 존재하는지 확인
-    String input = Serial.readStringUntil('\n'); // 줄바꿈 문자('\n')가 나올 때까지 문자열을 읽어 'input'이라는 변수에 저장
+    String input = Serial.readStringUntil('\n'); 
+    // 줄바꿈 문자('\n')가 나올 때까지 문자열을 읽어 'input'이라는 변수에 저장
     
     // ================================
     // 1. 밝기 조절 명령 처리
