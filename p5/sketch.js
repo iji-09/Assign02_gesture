@@ -1,7 +1,7 @@
 let port;  // 시리얼 포트 객체
 let isConnected = false; // 아두이노 연결 상태
 let selectedPort = null; // 선택된 포트 저장용
-let portSelect;          // 포트 선택 UI -> 이걸 쓰나?
+let portSelect;          // 포트 선택 UI
 
 // 신호등 기본 시간 설정값 (ms 단위)
 let redTime = 2000, yellowTime = 500, greenTime = 2000;
