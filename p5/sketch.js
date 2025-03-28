@@ -241,6 +241,19 @@ async function sendSerialData(data) {
     }
 }
 
+// 아두이노에서의 주기 조절을 위한 함수
+function sendTimingData() {
+    if (port && port.writable) {
+      let redVal = redSlider.value();
+      let yellowVal = yellowSlider.value();
+      let greenVal = greenSlider.value();
+  
+      sendSerialData(`TIMING:RED=${redVal},YELLOW=${yellowVal},GREEN=${greenVal}`);
+      console.log(`p5 → Arduino: TIMING:RED=${redVal},YELLOW=${yellowVal},GREEN=${greenVal}`);
+    }
+}
+  
+
 //---------------------------------//
 //          버튼 기능 구현          //
 //---------------------------------//
@@ -562,7 +575,7 @@ function detectGestureAndControlSlider() {
     }
     if (allFingersUp) isHandOpen = true; // 모든 손가락이 펴졌을 경우 isHandOpen = true
 
-    // 🤙 샤카: 엄지, 새끼손가락만 펼침
+    // 🤙 엄지검지: 엄지, 새끼손가락만 펼침
     let thumbUp = landmarks[4][0] < landmarks[3][0];  // 엄지 오른쪽으로 펼침
     let pinkyUp = landmarks[20][1] < landmarks[18][1];
     let indexDown = landmarks[8][1] > landmarks[6][1];
@@ -668,15 +681,3 @@ function updateTrafficLight() {
     } 
 }
 
-// 아두이노에서의 주기 조절을 위한 함수
-function sendTimingData() {
-    if (port && port.writable) {
-      let redVal = redSlider.value();
-      let yellowVal = yellowSlider.value();
-      let greenVal = greenSlider.value();
-  
-      sendSerialData(`TIMING:RED=${redVal},YELLOW=${yellowVal},GREEN=${greenVal}`);
-      console.log(`p5 → Arduino: TIMING:RED=${redVal},YELLOW=${yellowVal},GREEN=${greenVal}`);
-    }
-}
-  
