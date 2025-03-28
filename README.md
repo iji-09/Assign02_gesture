@@ -6,7 +6,7 @@
 ## 아두이노 & p5.js 동작 영상
 
 
-[![프로젝트 시연 영상]
+[![프로젝트 시연 영상](https://youtu.be/AYkG0jfUNxg?si=NCOf9eZCbI0TgNwX)
 
 
 
